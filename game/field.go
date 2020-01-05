@@ -55,14 +55,15 @@ type Box struct {
 }
 
 type Field struct {
+	grids  [][]Grid
+	player *Player
+	boxes  []*Box
+
 	initGrids  [][]Grid
 	initPlayer *Player
 	initBoxes  []*Box
 
-	grids  [][]Grid
-	player *Player
-	boxes  []*Box
-	steps  int
+	undoes []func()
 }
 
 func ParseField(str string) *Field {
@@ -100,10 +101,10 @@ func ParseField(str string) *Field {
 }
 
 func (f *Field) reset() {
-	f.steps = 0
 	f.grids = nil
 	f.player = nil
 	f.boxes = nil
+	f.undoes = nil
 
 	for _, gs := range f.initGrids {
 		newGs := make([]Grid, len(gs))
@@ -120,6 +121,14 @@ func (f *Field) reset() {
 			y: b.y,
 		})
 	}
+}
+
+func (f *Field) undo() {
+	if len(f.undoes) == 0 {
+		return
+	}
+	f.undoes[len(f.undoes)-1]()
+	f.undoes = f.undoes[:len(f.undoes)-1]
 }
 
 func (f *Field) gridAt(x, y int) Grid {
@@ -170,13 +179,21 @@ func (f *Field) tryMove(dx, dy int) {
 	if !ok {
 		return
 	}
+
 	f.player.x += dx
 	f.player.y += dy
 	if box != nil {
 		box.x += dx
 		box.y += dy
 	}
-	f.steps++
+	f.undoes = append(f.undoes, func() {
+		f.player.x -= dx
+		f.player.y -= dy
+		if box != nil {
+			box.x -= dx
+			box.y -= dy
+		}
+	})
 }
 
 func (f *Field) Update() {
@@ -194,6 +211,9 @@ func (f *Field) Update() {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		f.reset()
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
+		f.undo()
 	}
 }
 
@@ -243,7 +263,7 @@ func (f *Field) Draw(screen *ebiten.Image) {
 	// Render steps
 	bf := bitmapfont.Gothic12r
 
-	stepsMsg := fmt.Sprintf("Steps: %d", f.steps)
+	stepsMsg := fmt.Sprintf("Steps: %d", len(f.undoes))
 	b, _ := font.BoundString(bf, stepsMsg)
 	x := -b.Min.X.Round() + 8
 	y := -b.Min.Y.Round() + 8
@@ -254,5 +274,11 @@ func (f *Field) Draw(screen *ebiten.Image) {
 	b, _ = font.BoundString(bf, instMsg)
 	x = -b.Min.X.Round() + 8
 	y = -b.Min.Y.Round() + 24
+	text.Draw(screen, instMsg, bf, x, y, color.White)
+
+	instMsg = "Press Z to undo"
+	b, _ = font.BoundString(bf, instMsg)
+	x = -b.Min.X.Round() + 8
+	y = -b.Min.Y.Round() + 40
 	text.Draw(screen, instMsg, bf, x, y, color.White)
 }

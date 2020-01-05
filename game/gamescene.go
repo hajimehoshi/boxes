@@ -6,7 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten"
 )
 
-type GameScene struct{
+type GameScene struct {
 	field *Field
 }
 
